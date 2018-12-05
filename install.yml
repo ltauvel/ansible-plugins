@@ -1,0 +1,65 @@
+---
+- hosts: localhost
+  vars:
+    target_ansible_dir: "{{ lookup('env', 'HOME')}}/.ansible"
+    target_ansible_cfg: "{{ lookup('env', 'HOME')}}/.ansible.cfg"
+
+  tasks:
+    # Debug playbook variables
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    - debug: msg="target_ansible_dir = {{ target_ansible_dir }}"
+    - debug: msg="target_ansible_cfg = {{ target_ansible_cfg }}"
+
+    # Copy plugins and libraries in user home
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    - copy:
+        src: "./{{ item }}"
+        dest: "{{ target_ansible_dir }}"
+      with_items:
+        - action_plugins
+        - filter_plugins
+        - callback_plugins
+        - modules
+        - utils
+
+    # Create ansible.cfg file in user
+    # home if it does not exists
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    - stat:
+        path: "{{ target_ansible_cfg }}"
+      register: target_ansible_cfg_stat
+    - copy:
+        src: ./ansible.cfg
+        dest: "{{ target_ansible_cfg }}"
+      when: not target_ansible_cfg_stat.stat.exists
+
+    # Append path to the ansible configuration file
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    - replace:
+        path: "{{ target_ansible_cfg }}"
+        regexp: '[\s:]{{ target_ansible_dir }}/{{ item }}|{{ target_ansible_dir }}/{{ item }}[\s:]'
+        replace: ''
+      with_items:
+        - action_plugins
+        - filter_plugins
+        - callback
+        - modules/linux
+        - modules/windows
+
+    - lineinfile:
+        path: "{{ target_ansible_cfg }}"
+        insertafter: "[defaults]"
+        regexp: '^{{ item[0] }}\s*=\s*(.*)$'
+        line: '{{ item[0] }} = \1:{{ target_ansible_dir }}/{{ item[1] }}'
+        backrefs: yes
+      with_items:
+        - [[action_plugins, action_plugins]]
+        - [[filter_plugins, filter_plugins]]
+        - [[callback_plugins, callback_plugins]]
+        - [[modules, library/linux]]
+        - [[modules, library/windows]]
+
+    - replace:
+        path: "{{ target_ansible_cfg }}"
+        regexp: '=\s*:'
+        replace: '= '
