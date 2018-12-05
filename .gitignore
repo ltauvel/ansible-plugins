@@ -1,0 +1,8 @@
+*.pyc
+*.retry
+.vscode
+*.yml
+@install.yml
+Icon*
+@__init__.py
+
